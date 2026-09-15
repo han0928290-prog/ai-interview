@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { KeyRound } from "lucide-react";
 import AppHeader from "../components/AppHeader";
+import ApiKeyModal from "../components/ApiKeyModal";
+import {
+  API_KEY_HEADER,
+  clearStoredApiKey,
+  getStoredApiKey,
+  setStoredApiKey,
+} from "../lib/apiKey";
 
 type ChatMessage = {
   role: "assistant" | "user";
@@ -16,6 +24,9 @@ type InterviewResponse = {
   error?: string;
 };
 
+// 伺服器在缺少 / 拒絕 API Key 時會回 401，用專屬的錯誤類別方便前端辨識並自動彈出設定視窗
+class ApiKeyError extends Error {}
+
 export default function InterviewPage() {
   const [jobDescription, setJobDescription] = useState("");
   const [totalQuestions, setTotalQuestions] = useState(3);
@@ -29,20 +40,52 @@ export default function InterviewPage() {
     null
   );
 
+  const [apiKey, setApiKey] = useState("");
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
+
+  // 只能在瀏覽器端讀 localStorage，所以放在 useEffect（SSR 階段 window 不存在）
+  useEffect(() => {
+    setApiKey(getStoredApiKey());
+  }, []);
+
+  function handleSaveKey(key: string) {
+    setStoredApiKey(key);
+    setApiKey(key);
+    setKeyModalOpen(false);
+    setError(null);
+  }
+
+  function handleClearKey() {
+    clearStoredApiKey();
+    setApiKey("");
+    setKeyModalOpen(false);
+  }
+
   async function callInterviewApi(history: ChatMessage[]) {
     const res = await fetch("/api/interview", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        [API_KEY_HEADER]: apiKey,
+      },
       body: JSON.stringify({ jobDescription, history, totalQuestions }),
     });
     const data: InterviewResponse = await res.json();
     if (!res.ok || !data.message) {
+      if (res.status === 401) {
+        throw new ApiKeyError(data.error ?? "請先設定 OpenAI API Key");
+      }
       throw new Error(data.error ?? "發生未知錯誤");
     }
     return data;
   }
 
   async function handleStart() {
+    if (!apiKey.trim()) {
+      setError("請先設定你的 OpenAI API Key");
+      setKeyModalOpen(true);
+      return;
+    }
     if (!jobDescription.trim()) {
       setError("請先輸入職缺描述");
       return;
@@ -57,7 +100,12 @@ export default function InterviewPage() {
       }
       setStarted(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "發生未知錯誤");
+      if (e instanceof ApiKeyError) {
+        setError(e.message);
+        setKeyModalOpen(true);
+      } else {
+        setError(e instanceof Error ? e.message : "發生未知錯誤");
+      }
     } finally {
       setLoading(false);
     }
@@ -83,7 +131,12 @@ export default function InterviewPage() {
         setProgress({ current: data.questionNumber, total: data.totalQuestions });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "發生未知錯誤");
+      if (e instanceof ApiKeyError) {
+        setError(e.message);
+        setKeyModalOpen(true);
+      } else {
+        setError(e instanceof Error ? e.message : "發生未知錯誤");
+      }
     } finally {
       setLoading(false);
     }
@@ -110,13 +163,26 @@ export default function InterviewPage() {
         <div className="pointer-events-none absolute -top-24 left-1/2 h-80 w-[32rem] -translate-x-1/2 rounded-full bg-violet-600/15 blur-3xl" />
 
         <div className="relative mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white">
-              開始一場模擬面試
-            </h1>
-            <p className="mt-1 text-sm text-zinc-400">
-              輸入職缺描述，AI 面試官會依你設定的題數提問，回答完畢後給予評分、建議與每題的更好回答方式。
-            </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-white">
+                開始一場模擬面試
+              </h1>
+              <p className="mt-1 text-sm text-zinc-400">
+                輸入職缺描述，AI 面試官會依你設定的題數提問，回答完畢後給予評分、建議與每題的更好回答方式。
+              </p>
+            </div>
+            <button
+              onClick={() => setKeyModalOpen(true)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                apiKey
+                  ? "border-white/10 text-zinc-400 hover:bg-white/5"
+                  : "border-violet-400/40 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20"
+              }`}
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              {apiKey ? "API Key 已設定" : "設定 API Key"}
+            </button>
           </div>
 
           {!started && (
@@ -239,6 +305,14 @@ export default function InterviewPage() {
           )}
         </div>
       </main>
+
+      <ApiKeyModal
+        open={keyModalOpen}
+        initialValue={apiKey}
+        onClose={() => setKeyModalOpen(false)}
+        onSave={handleSaveKey}
+        onClear={handleClearKey}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { API_KEY_HEADER } from "../../lib/apiKey";
 
 // 沒有指定題數時的預設題數
 const DEFAULT_TOTAL_QUESTIONS = 3;
@@ -74,13 +75,14 @@ ${jobDescription}
 // Next.js Route Handler：處理 POST /api/interview
 // 前端每次「開始面試」或「送出回答」都會呼叫這支 API 一次
 export async function POST(request: Request) {
-  // 從環境變數讀取 OpenAI API Key（.env.local 裡的 OPENAI_API_KEY）
-  const apiKey = process.env.OPENAI_API_KEY;
+  // BYOK（Bring Your Own Key）：我們不使用伺服器自己的 OpenAI API Key，
+  // 而是要求前端在 header 帶上使用者自己輸入、存在瀏覽器 localStorage 的 Key。
+  // 這支 API 完全不持久化這把 Key，只在這次請求中用來呼叫 OpenAI。
+  const apiKey = request.headers.get(API_KEY_HEADER)?.trim();
   if (!apiKey) {
-    // 沒設定金鑰代表伺服器端設定有誤，回傳 500 並附上錯誤訊息
     return Response.json(
-      { error: "伺服器未設定 OPENAI_API_KEY" },
-      { status: 500 }
+      { error: "請先在設定中輸入你的 OpenAI API Key" },
+      { status: 401 }
     );
   }
 
@@ -163,8 +165,17 @@ export async function POST(request: Request) {
       totalQuestions,
     });
   } catch (error) {
-    // 呼叫 OpenAI 失敗（網路問題、金鑰錯誤、額度用完等），記錄錯誤方便除錯，並回傳統一的錯誤訊息給前端
+    // 記錄錯誤方便除錯（error 物件本身不含使用者輸入的 API Key，所以印出來是安全的）
     console.error("OpenAI request failed:", error);
+
+    // OpenAI SDK 的錯誤會帶 status，401/403 通常代表使用者輸入的 Key 無效或過期
+    if (error instanceof OpenAI.APIError && (error.status === 401 || error.status === 403)) {
+      return Response.json(
+        { error: "OpenAI API Key 無效或已過期，請重新確認後在設定中更新" },
+        { status: 401 }
+      );
+    }
+
     return Response.json(
       { error: "呼叫 OpenAI API 失敗，請稍後再試" },
       { status: 502 }

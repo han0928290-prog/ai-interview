@@ -39,16 +39,21 @@ const FEATURES = [
 const STEPS = [
   {
     number: "01",
+    title: "設定你的 API Key",
+    description: "輸入自己的 OpenAI API Key，只存在你的瀏覽器，不會上傳到我們的資料庫。",
+  },
+  {
+    number: "02",
     title: "貼上職缺描述",
     description: "把你要應徵的職缺 JD 貼進去，並設定想練習的題數。",
   },
   {
-    number: "02",
+    number: "03",
     title: "逐題作答",
     description: "AI 面試官依序提問，你像真實面試一樣打字回答。",
   },
   {
-    number: "03",
+    number: "04",
     title: "獲得評分與建議",
     description: "回答完畢後拿到總體評分、優缺點，以及每一題的更好回答方式。",
   },
@@ -64,12 +69,12 @@ const FAQS = [
     a: "可以，開始面試前可自由設定 1 到 10 題，依練習時間彈性調整。",
   },
   {
-    q: "需要付費嗎？",
-    a: "目前完全免費開放使用。",
+    q: "需要付費嗎？為什麼要自己的 API Key？",
+    a: "網站本身免費使用。我們採 BYOK（Bring Your Own Key）模式，請你輸入自己的 OpenAI API Key，費用依你在 OpenAI 的用量計算，我們不會另外收費。",
   },
   {
-    q: "我的回答內容會被儲存嗎？",
-    a: "不會存進資料庫。你的職缺描述與回答只會在當次對話中用來即時生成問題與講評。",
+    q: "我的 API Key 和回答內容安全嗎？",
+    a: "API Key 只會存在你瀏覽器的 localStorage，僅在你使用面試功能時隨請求送出。你的職缺描述與回答同樣不會存進我們的資料庫，只用於當次對話即時生成問題與講評。",
   },
 ];
 
@@ -193,8 +198,8 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="relative mt-16 grid grid-cols-1 gap-10 sm:grid-cols-3">
-              <div className="pointer-events-none absolute top-6 left-0 right-0 hidden h-px bg-gradient-to-r from-transparent via-white/15 to-transparent sm:block" />
+            <div className="relative mt-16 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="pointer-events-none absolute top-6 left-0 right-0 hidden h-px bg-gradient-to-r from-transparent via-white/15 to-transparent lg:block" />
               {STEPS.map((step) => (
                 <div key={step.number} className="relative flex flex-col items-center text-center">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[#0a0a12] text-sm font-semibold text-gradient">
